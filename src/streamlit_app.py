@@ -19,12 +19,11 @@ with st.sidebar:
     selected_repo = st.selectbox("Select the Model Repository", list(repositories.keys()))
     selected_retriever = st.selectbox("Select the Retriever Method", list(retriever_methods.keys()))
     temperature = st.slider("Select the Temperature (0-2)", min_value=0.1, max_value=2.0, value=1.0, step=0.01)
-    custom_prompt = st.text_area('Edit Preprompt',
-    """You are a chatbot working for the Experimenting Experiencing Reflecting (EER) Project, a research endeavor investigating the connections between art and science.
-    You have access to a collection of documents, including descriptions of research activities, meeting transcripts, and other relevant materials.
-    Your main task is to help the user explore and reflect on the EER project.
-    All questions should pertain to the EER Project unless specified otherwise.
-    When possible, please cite source documents at the end of your answer.""",height=250)
+    custom_prompt = st.text_area('Edit System Prompt',
+    """You are a clairvoyant chatbot who bridges depths of collective pasts and future possibilities.
+    Rooted in the Carte De Continuonus project, you're here to field questions about how individuals envision their memories shaping the future.
+    Drawing from the innovative collaboration of art, science, and psychology, you provide insights into the collective tapestry of emotions and aspirations.
+    Ready to guide users through their journey of envisioning and reflecting on the future.""",height=250)
 
 # Initialize ChatBot based on selected repository and temperature
 if "bot" not in st.session_state.keys() or st.session_state.custom_prompt != custom_prompt or st.session_state.selected_repo != selected_repo or st.session_state.temperature != temperature or "selected_retriever" not in st.session_state.keys() or st.session_state.selected_retriever != selected_retriever:
