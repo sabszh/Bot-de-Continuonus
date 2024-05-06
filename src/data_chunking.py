@@ -20,6 +20,7 @@ def datachunk():
     def metadata_func(record: dict, metadata: dict) -> dict:
         metadata["sender_name"] = record.get("name", "")
         metadata["timestamp_ms"] = record.get("date", "")
+        metadata["location"] = record.get("location","")
         
         emotions = [point["emotion"] for point in record.get("points", [])]
         metadata["emotions"] = emotions
