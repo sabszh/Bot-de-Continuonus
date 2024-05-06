@@ -9,7 +9,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint as HuggingFaceHub
 from dotenv import load_dotenv
 from pinecone import Pinecone as pc
-from pinecone import PodSpec
+from pinecone import ServerlessSpec
 import os
 
 from data_chunking import datachunk
@@ -22,8 +22,7 @@ class ChatBot():
     pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=embeddings)
     
     index_name = "futurebot"
-    environment = "gcp-starter"
-    spec = PodSpec(environment=environment)
+    spec = ServerlessSpec(cloud="aws",region="us-east-1")
     
     if index_name not in pinecone_instance.list_indexes().names():
         print("Creating new Pinecone index and loading documents")

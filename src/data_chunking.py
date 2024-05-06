@@ -10,18 +10,29 @@ import os
 import sys
 sys.path.append("..")  
 
-os
-
 load_dotenv()
 
 def datachunk():
-    json_file = os.path.join("data","sample.json")
-
+    json_file = os.path.join("data","all.json")
     documents = []
-    
-    loader = JSONLoader(json_file)
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0, length_function=len)
-    docs = text_splitter.split_documents(documents)
+    # Define the metadata extraction function.
+    def metadata_func(record: dict, metadata: dict) -> dict:
+        metadata["sender_name"] = record.get("name", "")
+        metadata["timestamp_ms"] = record.get("date", "")
+        
+        emotions = [point["emotion"] for point in record.get("points", [])]
+        metadata["emotions"] = emotions
+        
+        return metadata
+
+    loader = JSONLoader(
+        file_path=json_file,
+        jq_schema='.[]',
+        content_key="text",
+        metadata_func=metadata_func
+    )
+
+    documents.extend(loader.load())
     
-    return docs
+    return documents
