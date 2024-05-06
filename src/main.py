@@ -21,10 +21,10 @@ class ChatBot():
     embeddings = HuggingFaceEmbeddings(model_name = "intfloat/multilingual-e5-large")
     pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=embeddings)
     
-    index_name = "futurebot"
-    spec = ServerlessSpec(cloud="aws",region="us-east-1")
+    #index_name = "futurebot"
+    #spec = ServerlessSpec(cloud="aws",region="us-east-1")
     
-    if index_name not in pinecone_instance.list_indexes().names():
+    """if index_name not in pinecone_instance.list_indexes().names():
         print("Creating new Pinecone index and loading documents")
         docs = datachunk()
         pinecone_instance.create_index(name=index_name, metric="cosine", dimension=1024, spec=spec)
@@ -32,7 +32,7 @@ class ChatBot():
         print("Created new Pinecone index and loaded documents")
     else:
         docsearch = Pinecone.from_existing_index(index_name, embeddings)
-        print("Using existing Pinecone index")
+        print("Using existing Pinecone index")"""
     
     docsearch = Pinecone.from_existing_index(index_name, embeddings)
     
