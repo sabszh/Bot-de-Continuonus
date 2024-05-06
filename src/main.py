@@ -21,7 +21,7 @@ class ChatBot():
     embeddings = HuggingFaceEmbeddings(model_name = "intfloat/multilingual-e5-large")
     pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=embeddings)
     
-    #index_name = "futurebot"
+    index_name = "futurebot"
     #spec = ServerlessSpec(cloud="aws",region="us-east-1")
     
     """if index_name not in pinecone_instance.list_indexes().names():
