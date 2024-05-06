@@ -15,7 +15,7 @@ os
 load_dotenv()
 
 def datachunk():
-    json_file = os.path.join("data","all.json")
+    json_file = os.path.join("data","sample.json")
 
     documents = []
     
