@@ -57,7 +57,7 @@ else:
 
 # Function for generating LLM response
 def generate_response(messages):
-    input_text = "\n".join(message["content"] for message in messages)
+    input_text = " ".join(message["content"] for message in messages)
     result = bot.rag_chain.invoke(input_text)
     return result
 
