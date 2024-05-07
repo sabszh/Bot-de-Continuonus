@@ -18,7 +18,7 @@ load_dotenv()
 
 class ChatBot():
     
-    embeddings = HuggingFaceEmbeddings(model_name = "intfloat/multilingual-e5-large")
+    embeddings = HuggingFaceEmbeddings()
     pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=embeddings)
     
     index_name = "futurebot"
