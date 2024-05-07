@@ -13,6 +13,12 @@ retriever_methods = {
 }
 
 st.set_page_config(page_title="Bot de Continuonus")
+
+# Initialize ChatBot based on selected repository and temperature
+@st.cache_resource(ttl=1800)
+def load_model(repo_id, temperature, retriever_method, custom_prompt):
+    return ChatBot(repo_id=repo_id, temperature=temperature, retriever_method=retriever_method, custom_template=custom_prompt)
+
 with st.sidebar:
     st.title('Bot de Continuonus')
     st.write("Be aware, if you make any changes here that the chatbot will reload and your chat will be gone.")
@@ -26,12 +32,11 @@ with st.sidebar:
     Ready to guide users through their journey of envisioning and reflecting on the future.""",height=250)
 
 # Initialize ChatBot based on selected repository and temperature
-@st.cache(allow_output_mutation=True)
-def load_model():
-    return ChatBot(repo_id=st.session_state.repo_id, temperature=st.session_state.temperature, retriever_method=st.session_state.retriever_method)
-
-# Initialize ChatBot based on selected repository and temperature
-if "bot" not in st.session_state.keys() or st.session_state.custom_prompt != custom_prompt or st.session_state.selected_repo != selected_repo or st.session_state.temperature != temperature or "selected_retriever" not in st.session_state.keys() or st.session_state.selected_retriever != selected_retriever:
+if "bot" not in st.session_state or st.session_state.get("custom_prompt") != custom_prompt \
+    or st.session_state.get("selected_repo") != selected_repo \
+    or st.session_state.get("temperature") != temperature \
+    or st.session_state.get("selected_retriever") != selected_retriever:
+    
     # Determine repo_id based on selected_repo
     repo_id = repositories[selected_repo]
     
@@ -39,48 +44,45 @@ if "bot" not in st.session_state.keys() or st.session_state.custom_prompt != cus
     retriever_method = retriever_methods[selected_retriever]
     
     # Store repo_id and retriever_method in session_state
-    st.session_state.repo_id = repo_id
-    st.session_state.retriever_method = retriever_method
+    st.session_state["repo_id"] = repo_id
+    st.session_state["retriever_method"] = retriever_method
     
     # Initialize ChatBot with repo_id and retriever_method
-    bot = ChatBot(custom_template=custom_prompt, repo_id=repo_id, temperature=temperature, retriever_method=retriever_method)
+    bot = load_model(repo_id, temperature, retriever_method, custom_prompt)
     
     # Store bot and other parameters in session_state
-    st.session_state.bot = bot
-    st.session_state.custom_prompt = custom_prompt
-    st.session_state.selected_repo = selected_repo
-    st.session_state.temperature = temperature
-    st.session_state.messages = [{"role": "assistant", "content": "Hi, how can I help you today?"}]
-    st.session_state.selected_retriever = selected_retriever
+    st.session_state["bot"] = bot
+    st.session_state["custom_prompt"] = custom_prompt
+    st.session_state["selected_repo"] = selected_repo
+    st.session_state["temperature"] = temperature
+    st.session_state["selected_retriever"] = selected_retriever
+
 else:
-    bot = st.session_state.bot
+    bot = st.session_state["bot"]
 
 # Function for generating LLM response
 def generate_response(messages):
     input_text = " ".join(message["content"] for message in messages)
-    result = bot.rag_chain.invoke(input_text)
-    return result
-
-# Store LLM generated responses
-if "messages" not in st.session_state.keys():
-    st.session_state.messages = [{"role": "assistant", "content": "Hi, how can I help you today?"}]
+    return bot.rag_chain.invoke(input_text)
 
 # Display chat messages
-for message in st.session_state.messages:
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hi, how can I help you today?"}]
+
+for message in st.session_state["messages"]:
     with st.chat_message(message["role"]):
         st.write(message["content"])
         
 # User-provided prompt
-if input := st.chat_input():
-    st.session_state.messages.append({"role": "user", "content": input})
+if input_text := st.chat_input():
+    st.session_state["messages"].append({"role": "user", "content": input_text})
     with st.chat_message("user"):
-        st.write(input)
+        st.write(input_text)
 
 # Generate a new response if last message is not from assistant
-if st.session_state.messages[-1]["role"] != "assistant":
+if st.session_state["messages"][-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         with st.spinner("Generating an answer.."):
-            response = generate_response(st.session_state.messages)
+            response = generate_response(st.session_state["messages"])
             st.write(response)
-    message = {"role": "assistant", "content": response}
-    st.session_state.messages.append(message)
+            st.session_state["messages"].append({"role": "assistant", "content": response})
