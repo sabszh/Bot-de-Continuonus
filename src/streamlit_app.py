@@ -15,7 +15,7 @@ retriever_methods = {
 st.set_page_config(page_title="Bot de Continuonus")
 
 # Initialize ChatBot based on selected repository and temperature
-@st.cache_resource(ttl=1800)
+@st.cache_resource()
 def load_model(repo_id, temperature, retriever_method, custom_prompt):
     return ChatBot(repo_id=repo_id, temperature=temperature, retriever_method=retriever_method, custom_template=custom_prompt)
 
