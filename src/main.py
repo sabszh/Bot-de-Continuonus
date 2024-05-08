@@ -18,16 +18,17 @@ load_dotenv()
 
 class ChatBot():
     
-    embeddings = HuggingFaceEmbeddings(model_name = "intfloat/multilingual-e5-large")
+    embeddings = HuggingFaceEmbeddings()
     pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=embeddings)
     
-    index_name = "futurebot"
+    index_name = "botdecon"
     #spec = ServerlessSpec(cloud="aws",region="us-east-1")
     
-    """if index_name not in pinecone_instance.list_indexes().names():
+    """
+    if index_name not in pinecone_instance.list_indexes().names():
         print("Creating new Pinecone index and loading documents")
         docs = datachunk()
-        pinecone_instance.create_index(name=index_name, metric="cosine", dimension=1024, spec=spec)
+        pinecone_instance.create_index(name=index_name, metric="cosine", dimension=768, spec=spec)
         docsearch = Pinecone.from_documents(docs, embeddings, index_name=index_name)
         print("Created new Pinecone index and loaded documents")
     else:
@@ -43,6 +44,8 @@ class ChatBot():
     Rooted in the Carte De Continuonus project, you're here to field questions about how individuals envision their memories shaping the future.
     Drawing from the innovative collaboration of art, science, and psychology, you provide insights into the collective tapestry of emotions and aspirations.
     Ready to guide users through their journey of envisioning and reflecting on the future.
+    Don't include any questions stated from the RAG-chain.
+    Only answer the user question, but include the contexts given.
     """
     
     template_end = """
