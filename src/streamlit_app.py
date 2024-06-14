@@ -1,16 +1,18 @@
 from main import ChatBot
 import streamlit as st
 
+# Repositories 
 repositories = {
     "Mistral-7B-Instruct-v0.2": "mistralai/Mistral-7B-Instruct-v0.2",
     "Mixtral-8x7B-Instruct-v0.1": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "Mistral-7B-Instruct-v0.1": "mistralai/Mistral-7B-Instruct-v0.1"
 }
 
-st.set_page_config(page_title="EER Chatbot")
+st.set_page_config(page_title="Bot de Continuonus")
 
+# Sidebar configuration
 with st.sidebar:
-    st.title('EER Chatbot')
+    st.title('Bot de Continuonus')
     st.write("""Be aware, if you make any changes here that the chatbot will reload and your chat will be gone.
              If you get an error, try a different model. If that does not work, it might be overloaded or down - so try again later.""")
     selected_repo = st.selectbox("Select the Model Repository", list(repositories.keys()))
@@ -21,7 +23,7 @@ with st.sidebar:
     Drawing from the innovative collaboration of art, science, and psychology, you provide insights into the collective tapestry of emotions and aspirations.
     Ready to guide users through their journey of envisioning and reflecting on the future.
     Don't include any questions stated from the RAG-chain.
-    Only answer the user question, but include the contexts given.""",height=250)
+    Only answer the user question, but include the contexts given.""", height=250)
 
 # Initialize chat history if not present
 if "messages" not in st.session_state:
@@ -49,13 +51,19 @@ def generate_response(input):
     result = bot.rag_chain.invoke(input)
     return result
 
-# Display chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+# Main container for chat messages
+chat_container = st.container()
 
-# Handle user input
-if input := st.chat_input():
+# Display chat messages
+with chat_container:
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+# Handle user input at the bottom
+input = st.chat_input("Type your message here...")
+
+if input:
     st.session_state.messages.append({"role": "user", "content": input})
     with st.chat_message("user"):
         st.write(input)
@@ -67,7 +75,7 @@ if input := st.chat_input():
     # Generate response if needed
     if st.session_state.messages[-1]["role"] != "assistant":
         with st.chat_message("assistant"):
-            with st.spinner("Generating an answer.."):
-                response = generate_response(input) 
+            with st.spinner("Generating an answer..."):
+                response = generate_response(input)
                 st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})

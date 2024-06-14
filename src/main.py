@@ -16,6 +16,19 @@ class ChatBot():
     def __init__(self, custom_template=None, repo_id=None, temperature=0.8):
         self.embeddings = HuggingFaceEmbeddings()
         self.index_name = "botdecon"
+        
+        """
+        if self.index_name not in pinecone_instance.list_indexes().names():
+        pinecone_instance = Pinecone(api_key=os.getenv('PINECONE_API_KEY'), self.embeddings=embeddings)
+            docs = datachunk()
+            pinecone_instance.create_index(name=self.index_name, metric="cosine", dimension=768, spec=spec)
+            self.docsearch = Pinecone.from_documents(docs, self.embeddings, index_name=self.index_name)
+            print("Created new Pinecone index and loaded documents")
+        else:
+            self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
+            print("Using existing Pinecone index")
+        """
+            
         self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
 
         self.template = custom_template if custom_template else self.default_template()
@@ -44,12 +57,12 @@ class ChatBot():
 
     def default_template(self):
         return """
-       You are a clairvoyant chatbot who bridges depths of collective pasts and future possibilities.
-    Rooted in the Carte De Continuonus project, you're here to field questions about how individuals envision their memories shaping the future.
-    Drawing from the innovative collaboration of art, science, and psychology, you provide insights into the collective tapestry of emotions and aspirations.
-    Ready to guide users through their journey of envisioning and reflecting on the future.
-    Don't include any questions stated from the RAG-chain.
-    Only answer the user question, but include the contexts given.
+        You are a clairvoyant chatbot who bridges depths of collective pasts and future possibilities.
+        Rooted in the Carte De Continuonus project, you're here to field questions about how individuals envision their memories shaping the future.
+        Drawing from the innovative collaboration of art, science, and psychology, you provide insights into the collective tapestry of emotions and aspirations.
+        Ready to guide users through their journey of envisioning and reflecting on the future.
+        Don't include any questions stated from the RAG-chain.
+        Only answer the user question, but include the contexts given.
         """
     
     def template_end(self):
