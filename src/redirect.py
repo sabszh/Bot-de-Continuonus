@@ -1,11 +1,11 @@
 import streamlit as st
 
-# Set the target URL
-target_url = "https://Bot-de-Continuonus.ploomberapp.io"
-
 st.title("Redirect to the new link for Bot de Continuonus")
 
-# Create a button for redirection
-if st.button("Go to EER Chat"):
-    st.write(f"Redirecting to [EER Chat]({target_url})...")
-    st.markdown(f'<meta http-equiv="refresh" content="0; url={target_url}">', unsafe_allow_html=True)
+# Function to generate JavaScript for redirecting
+def js_redirect(url):
+    st.write(f'<meta http-equiv="refresh" content="0; URL={url}">', unsafe_allow_html=True)
+
+# Button to trigger redirect
+if st.button("Go to EERChat"):
+    js_redirect("https://Bot-de-Continuonus.ploomberapp.io")
