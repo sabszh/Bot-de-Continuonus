@@ -21,6 +21,7 @@ def datachunk():
         metadata["sender_name"] = record.get("name", "")
         metadata["timestamp_ms"] = record.get("date", "")
         metadata["location"] = record.get("location","")
+        metadata["title"] = record.get("title","")
         
         emotions = [point["emotion"] for point in record.get("points", [])]
         metadata["emotions"] = emotions
