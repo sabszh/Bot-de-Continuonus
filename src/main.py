@@ -8,6 +8,11 @@ from langchain.schema.output_parser import StrOutputParser
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint as HuggingFaceHub
 from dotenv import load_dotenv
+from data_chunking import datachunk
+from pinecone import Pinecone as pc
+from pinecone import PodSpec
+from pinecone import ServerlessSpec
+
 import os
 
 load_dotenv()
@@ -15,11 +20,11 @@ load_dotenv()
 class ChatBot():
     def __init__(self, custom_template=None, repo_id=None, temperature=0.8):
         self.embeddings = HuggingFaceEmbeddings()
-        self.index_name = "botdecon"
-        
-        """
+        self.index_name = "botcon"
+        pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=self.embeddings)
+        spec = ServerlessSpec(cloud="aws",region="us-east-1")
+
         if self.index_name not in pinecone_instance.list_indexes().names():
-        pinecone_instance = Pinecone(api_key=os.getenv('PINECONE_API_KEY'), self.embeddings=embeddings)
             docs = datachunk()
             pinecone_instance.create_index(name=self.index_name, metric="cosine", dimension=768, spec=spec)
             self.docsearch = Pinecone.from_documents(docs, self.embeddings, index_name=self.index_name)
@@ -27,7 +32,7 @@ class ChatBot():
         else:
             self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
             print("Using existing Pinecone index")
-        """
+        
             
         self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
 
@@ -71,3 +76,6 @@ class ChatBot():
         Question: {question}
         Answer: 
         """
+
+#if __name__ == "__main__":
+#    bot = ChatBot(repo_id="mistralai/Mistral-7B-Instruct-v0.2")
