@@ -1,4 +1,4 @@
-data/all.json
+#data/all.json
 data/sample.json
 .env
 .venv
