@@ -1,5 +1,6 @@
 from main import ChatBot
 import streamlit as st
+import json
 
 # Repositories 
 repositories = {
@@ -24,6 +25,10 @@ with st.sidebar:
     Ready to guide users through their journey of envisioning and reflecting on the future.
     Don't include any questions stated from the RAG-chain.
     Only answer the user question, but include the contexts given.""", height=250)
+
+# Load reference data
+with open("data/all.json") as f:
+    reference_data = json.load(f)
 
 # Initialize chat history if not present
 if "messages" not in st.session_state:
@@ -51,31 +56,47 @@ def generate_response(input):
     result = bot.rag_chain.invoke(input)
     return result
 
+# Layout with two columns
+col1, col2 = st.columns([2, 1])
+
 # Main container for chat messages
-chat_container = st.container()
+with col1:
+    chat_container = st.container()
 
-# Display chat messages
-with chat_container:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+    # Display chat messages
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
 
-# Handle user input at the bottom
-input = st.chat_input("Type your message here...")
+    # Handle user input at the bottom
+    input = st.chat_input("Type your message here...")
 
-if input:
-    st.session_state.messages.append({"role": "user", "content": input})
-    with st.chat_message("user"):
-        st.write(input)
+    if input:
+        st.session_state.messages.append({"role": "user", "content": input})
+        with st.chat_message("user"):
+            st.write(input)
 
-    # Store the first question if not already set
-    if not st.session_state.first_question:
-        st.session_state.first_question = input
+        # Store the first question if not already set
+        if not st.session_state.first_question:
+            st.session_state.first_question = input
 
-    # Generate response if needed
-    if st.session_state.messages[-1]["role"] != "assistant":
-        with st.chat_message("assistant"):
-            with st.spinner("Generating an answer..."):
-                response = generate_response(input)
-                st.write(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        # Generate response if needed
+        if st.session_state.messages[-1]["role"] != "assistant":
+            with st.chat_message("assistant"):
+                with st.spinner("Generating an answer..."):
+                    response = generate_response(input)
+                    st.write(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+# Reference data display
+with col2:
+    st.title("Reference Data")
+    for item in reference_data:
+        st.subheader(item["title"])
+        st.write(f"Location: {item['location']}")
+        st.write(f"Date: {item['date']}")
+        st.write(f"Text: {item['text']}")
+        for point in item["points"]:
+            st.write(f"Emotion: {point['emotion']}, Distance: {point['distance']}, Coordinates: ({point['x']}, {point['y']})")
+        st.write("---")

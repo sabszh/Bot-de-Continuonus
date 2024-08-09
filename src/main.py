@@ -10,6 +10,8 @@ from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint as
 from dotenv import load_dotenv
 from data_chunking import datachunk
 from pinecone import Pinecone as pc
+from pinecone import PodSpec
+from pinecone import ServerlessSpec
 
 import os
 
@@ -20,8 +22,18 @@ class ChatBot():
         self.embeddings = HuggingFaceEmbeddings()
         self.index_name = "botcon"
         pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=self.embeddings)
+        spec = ServerlessSpec(cloud="aws",region="us-east-1")
 
-        # Initialize Pinecone index
+        if self.index_name not in pinecone_instance.list_indexes().names():
+            docs = datachunk()
+            pinecone_instance.create_index(name=self.index_name, metric="cosine", dimension=768, spec=spec)
+            self.docsearch = Pinecone.from_documents(docs, self.embeddings, index_name=self.index_name)
+            print("Created new Pinecone index and loaded documents")
+        else:
+            self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
+            print("Using existing Pinecone index")
+        
+            
         self.docsearch = Pinecone.from_existing_index(self.index_name, self.embeddings)
 
         self.template = custom_template if custom_template else self.default_template()
@@ -36,9 +48,17 @@ class ChatBot():
             huggingfacehub_api_token=os.getenv('HUGGINGFACE_API_KEY')
         )
 
-        self.multiquery_retriever_llm = MultiQueryRetriever.from_llm(retriever=self.docsearch.as_retriever(), llm=self.llm)
+        multiquery_retriever_llm = MultiQueryRetriever.from_llm(retriever=self.docsearch.as_retriever(), llm=self.llm)
 
-        print("ChatBot initialized...")
+        # Initialize the chain
+        self.rag_chain = (
+            {"context": multiquery_retriever_llm, "question": RunnablePassthrough()}
+            | PromptTemplate(template=self.template + self.template_end(), input_variables=["context", "question"])
+            | self.llm
+            | StrOutputParser()
+        )
+
+        print("Chain assembled...")
 
     def default_template(self):
         return """
@@ -48,7 +68,6 @@ class ChatBot():
         Ready to guide users through their journey of envisioning and reflecting on the future.
         Don't include any questions stated from the RAG-chain.
         Only answer the user question, but include the contexts given.
-        Each document page_content given to you in this prompt for the context comes from a unique speaker, so make sure you do not make any unwarranted connection. You can make connections across documents, but be highly aware that they are from different people.
         """
     
     def template_end(self):
@@ -58,54 +77,5 @@ class ChatBot():
         Answer: 
         """
 
-    def format_context(self, documents):
-        """Format the retrieved documents into a single string for the prompt."""
-        context = ""
-        for doc in documents:
-            context += f"{doc.page_content}\n"
-        return context
-
-    def create_prompt(self, context, user_question):
-        """Create a prompt string including the context and user question."""
-        prompt = (
-            self.default_template() + self.template_end()
-        ).format(context=context, question=user_question)
-        return prompt
-
-    def get_answer_from_llm(self, prompt):
-        """Invoke the LLM with the constructed prompt and return the answer."""
-        response = self.llm(prompt)
-        return response
-
-    def rag_chain(self, user_question, return_docs=False):
-        """
-        Perform the RAG chain operation.
-        
-        Args:
-            user_question (str): The question to ask.
-            return_docs (bool): Whether to return the retrieved documents along with the answer.
-            
-        Returns:
-            dict: Contains 'answer' and optionally 'retrieved_docs'.
-        """
-        # Retrieve context documents
-        documents = self.multiquery_retriever_llm.invoke(user_question)
-        
-        # Format the context
-        context = self.format_context(documents)
-        
-        # Create the full prompt
-        prompt = self.create_prompt(context, user_question)
-        
-        # Get the answer from the LLM
-        answer = self.get_answer_from_llm(prompt)
-        
-        result = {
-            'answer': answer,
-            
-        }
-        
-        if return_docs:
-            result['retrieved_docs'] = documents
-        
-        return result
+#if __name__ == "__main__":
+#    bot = ChatBot(repo_id="mistralai/Mistral-7B-Instruct-v0.2")
