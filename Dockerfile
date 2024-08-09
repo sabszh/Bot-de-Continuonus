@@ -24,6 +24,6 @@ ENTRYPOINT ["streamlit", "run", "src/streamlit_app.py", \
             "--server.headless=true", \
             "--server.address=0.0.0.0", \
             "--browser.gatherUsageStats=false", \
-            "--server.enableStaticServing=true", \
+            "--server.enableStaticServing=false", \
             "--server.fileWatcherType=none", \
             "--client.toolbarMode=viewer"]

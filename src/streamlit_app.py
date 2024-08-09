@@ -1,5 +1,6 @@
 from main import ChatBot
 import streamlit as st
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
 # Repositories 
 repositories = {
@@ -8,7 +9,7 @@ repositories = {
     "Mistral-7B-Instruct-v0.1": "mistralai/Mistral-7B-Instruct-v0.1"
 }
 
-st.set_page_config(page_title="Bot de Continuonus")
+st.set_page_config(page_title="Bot de Continuonus", layout="wide")
 
 # Sidebar configuration
 with st.sidebar:
@@ -25,11 +26,16 @@ with st.sidebar:
     Don't include any questions stated from the RAG-chain.
     Only answer the user question, but include the contexts given.""", height=250)
 
-# Initialize chat history if not present
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hi, how can I help you today?"}]
-if "first_question" not in st.session_state:
-    st.session_state.first_question = ""
+# Initialize message history
+history = StreamlitChatMessageHistory(key="chat_messages")
+
+# Add initial message if it's the first time loading
+if len(history.messages) == 0:
+    history.add_ai_message("Ask me about the future!")
+
+# Initialize document history if not present
+if "documents" not in st.session_state:
+    st.session_state.documents = []
 
 # Initialize ChatBot instance if needed
 def initialize_bot():
@@ -48,34 +54,71 @@ else:
 
 # Function for generating LLM response
 def generate_response(input):
-    result = bot.rag_chain.invoke(input)
+    result = bot.rag_chain(input, return_docs=True)
     return result
 
-# Main container for chat messages
-chat_container = st.container()
+# Add custom CSS to fix the input field at the bottom
+st.markdown("""
+    <style>
+    .stTextInput, .stButton {
+        position: fixed;
+        bottom: 10px;
+        width: calc(100% - 20px);
+        margin-left: 10px;
+        margin-right: 10px;
+    }
+    .stButton { 
+        margin-top: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Display chat messages
-with chat_container:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+# Create two columns: one for chat, one for sources
+chat_col, sources_col = st.columns([2, 1])
+
+# Main container for chat messages
+with chat_col:
+    chat_container = st.container()
+
+    # Display chat messages
+    with chat_container:
+        for message in history.messages:
+            st.chat_message(message.type).write(message.content)
 
 # Handle user input at the bottom
 input = st.chat_input("Type your message here...")
 
 if input:
-    st.session_state.messages.append({"role": "user", "content": input})
-    with st.chat_message("user"):
+    history.add_user_message(input)
+    with chat_col.chat_message("user"):
         st.write(input)
 
-    # Store the first question if not already set
-    if not st.session_state.first_question:
-        st.session_state.first_question = input
-
     # Generate response if needed
-    if st.session_state.messages[-1]["role"] != "assistant":
-        with st.chat_message("assistant"):
+    if history.messages[-1].type != "ai":
+        with chat_col.chat_message("ai"):
             with st.spinner("Generating an answer..."):
                 response = generate_response(input)
-                st.write(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+                answer = response["answer"]
+                retrieved_docs = response["retrieved_docs"]
+
+                st.write(answer)
+                history.add_ai_message(answer)
+                st.session_state.documents.insert(0, {
+                    "answer": answer,
+                    "retrieved_docs": retrieved_docs
+                })
+
+# Display sources in the right column
+with sources_col:
+    if st.session_state.documents:
+        tabs = st.tabs([f"Message {len(st.session_state.documents) - i}" for i in range(len(st.session_state.documents))])
+        for i, tab in enumerate(tabs):
+            with tab:
+                doc_history = st.session_state.documents[i]
+                for idx, doc in enumerate(doc_history["retrieved_docs"], 1):
+                    with st.expander(f"Source {idx}"):
+                        st.write(f"**Content:** {doc.page_content}")
+                        st.write(f"**Emotions:** {doc.metadata['emotions']}")
+                        st.write(f"**Location:** {doc.metadata['location']}")
+    else:
+        st.write("Sources will appear here after you ask a question...")
