@@ -1,12 +1,12 @@
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores.pinecone import Pinecone
 from langchain.prompts import PromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 from langchain.retrievers.multi_query import MultiQueryRetriever
-from langchain_huggingface import HuggingFaceEndpoint as HuggingFaceHub
+from langchain_community.llms.huggingface_endpoint import HuggingFaceEndpoint as HuggingFaceHub
 from dotenv import load_dotenv
 from data_chunking import datachunk
 from pinecone import Pinecone as pc
