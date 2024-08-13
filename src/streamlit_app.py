@@ -13,7 +13,7 @@ st.set_page_config(page_title="Bot de Continuonus", layout="wide")
 
 # Sidebar configuration
 with st.sidebar:
-    st.title('Bot de Continuonus')
+    st.title('LLM Settings')
     st.write("""Be aware, if you make any changes here that the chatbot will reload and your chat will be gone.
              If you get an error, try a different model. If that does not work, it might be overloaded or down - so try again later.""")
     selected_repo = st.selectbox("Select the Model Repository", list(repositories.keys()))
@@ -31,7 +31,7 @@ history = StreamlitChatMessageHistory(key="chat_messages")
 
 # Add initial message if it's the first time loading
 if len(history.messages) == 0:
-    history.add_ai_message("Ask me about the future!")
+    history.add_ai_message("What would you like to ask me about what people wrote in the Carte De Continuonus project?")
 
 # Initialize document history if not present
 if "documents" not in st.session_state:
@@ -57,7 +57,7 @@ def generate_response(input):
     result = bot.rag_chain(input, return_docs=True)
     return result
 
-# Add custom CSS to fix the input field at the bottom
+# Add custom CSS to fix the input field at the bottom and style the sources column
 st.markdown("""
     <style>
     .stTextInput, .stButton {
@@ -70,6 +70,11 @@ st.markdown("""
     .stButton { 
         margin-top: 10px;
     }
+    .sources-col {
+        background-color: #f0f0f0;
+        padding: 20px;
+        border-radius: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -78,6 +83,8 @@ chat_col, sources_col = st.columns([2, 1])
 
 # Main container for chat messages
 with chat_col:
+    st.title("Bot de Continuonus")
+    st.write('Bot de Continuous is an artificial intelligence that allows you to explore what people participating in the Continuous artwork entered when asked "What do you want the future to remember?"')
     chat_container = st.container()
 
     # Display chat messages
@@ -96,7 +103,7 @@ if input:
     # Generate response if needed
     if history.messages[-1].type != "ai":
         with chat_col.chat_message("ai"):
-            with st.spinner("Generating an answer..."):
+            with st.spinner("Thinking..."):
                 response = generate_response(input)
                 answer = response["answer"]
                 retrieved_docs = response["retrieved_docs"]
@@ -108,17 +115,17 @@ if input:
                     "retrieved_docs": retrieved_docs
                 })
 
-# Display sources in the right column
+# Display sources in the right column with greyed-out style
 with sources_col:
+    st.write("# Sources referenced")
     if st.session_state.documents:
         tabs = st.tabs([f"Message {len(st.session_state.documents) - i}" for i in range(len(st.session_state.documents))])
         for i, tab in enumerate(tabs):
             with tab:
                 doc_history = st.session_state.documents[i]
                 for idx, doc in enumerate(doc_history["retrieved_docs"], 1):
-                    with st.expander(f"Source {idx}"):
-                        st.write(f"**Content:** {doc.page_content}")
+                    with st.expander(f"{doc.page_content}"):
                         st.write(f"**Emotions:** {doc.metadata['emotions']}")
                         st.write(f"**Location:** {doc.metadata['location']}")
-    else:
-        st.write("Sources will appear here after you ask a question...")
+                        st.write(f"**Date:** {doc.metadata['timestamp_ms']}")
+                        st.write(f"**Sender name:** {doc.metadata['sender_name']}")
