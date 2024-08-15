@@ -33,9 +33,17 @@ history = StreamlitChatMessageHistory(key="chat_messages")
 if len(history.messages) == 0:
     history.add_ai_message("What would you like to ask me about what people wrote in the Carte De Continuonus project?")
 
-# Initialize document history if not present
-if "documents" not in st.session_state:
-    st.session_state.documents = []
+# Initialize a container to hold both AI and user messages along with their references
+if "chat_data" not in st.session_state:
+    st.session_state.chat_data = []
+
+# Add initial AI prompt message to the state if it's not already there
+if len(st.session_state.chat_data) == 0:
+    st.session_state.chat_data.append({
+        "type": "ai",
+        "content": "What would you like to ask me about what people wrote in the Carte De Continuonus project?",
+        "retrieved_docs": []  # No references for the initial prompt
+    })
 
 # Initialize ChatBot instance if needed
 def initialize_bot():
@@ -57,75 +65,67 @@ def generate_response(input):
     result = bot.rag_chain(input, return_docs=True)
     return result
 
-# Add custom CSS to fix the input field at the bottom and style the sources column
-st.markdown("""
-    <style>
-    .stTextInput, .stButton {
-        position: fixed;
-        bottom: 10px;
-        width: calc(100% - 20px);
-        margin-left: 10px;
-        margin-right: 10px;
-    }
-    .stButton { 
-        margin-top: 10px;
-    }
-    .sources-col {
-        background-color: #f0f0f0;
-        padding: 20px;
-        border-radius: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Create two columns: one for chat, one for sources
-chat_col, sources_col = st.columns([2, 1])
-
 # Main container for chat messages
-with chat_col:
-    st.title("Bot de Continuonus")
-    st.write('Bot de Continuous is an artificial intelligence that allows you to explore what people participating in the Continuous artwork entered when asked "What do you want the future to remember?"')
-    chat_container = st.container()
+st.title("Bot de Continuonus")
+st.write('Bot de Continuonus is an artificial intelligence that allows you to explore what people participating in the Continuous artwork entered when asked "What do you want the future to remember?"')
+chat_container = st.container()
 
-    # Display chat messages
-    with chat_container:
-        for message in history.messages:
-            st.chat_message(message.type).write(message.content)
+# Display chat messages and references
+with chat_container:
+    for entry in st.session_state.chat_data:
+        if entry["type"] == "user":
+            st.chat_message("user").write(entry["content"])
+        elif entry["type"] == "ai":
+            st.chat_message("ai").write(entry["content"])
+            if entry["retrieved_docs"]:
+                with st.expander("References", expanded=False):  # Keep the expander closed by default
+                    for idx, doc in enumerate(entry["retrieved_docs"], 1):
+                        st.markdown(f"**Document {idx}:** {doc.page_content}")
+                        st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
+                        st.markdown(f"**Location:** {doc.metadata['location']}")
+                        st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
+                        st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
 
 # Handle user input at the bottom
 input = st.chat_input("Type your message here...")
 
 if input:
+    # Store user message
+    st.session_state.chat_data.append({
+        "type": "user",
+        "content": input,
+        "retrieved_docs": []
+    })
     history.add_user_message(input)
-    with chat_col.chat_message("user"):
+    with chat_container.chat_message("user"):
         st.write(input)
 
     # Generate response if needed
     if history.messages[-1].type != "ai":
-        with chat_col.chat_message("ai"):
+        with chat_container.chat_message("ai"):
             with st.spinner("Thinking..."):
                 response = generate_response(input)
                 answer = response["answer"]
                 retrieved_docs = response["retrieved_docs"]
 
-                st.write(answer)
-                history.add_ai_message(answer)
-                st.session_state.documents.insert(0, {
-                    "answer": answer,
+                # Store both the AI response and its references together
+                st.session_state.chat_data.append({
+                    "type": "ai",
+                    "content": answer,
                     "retrieved_docs": retrieved_docs
                 })
 
-# Display sources in the right column with greyed-out style
-with sources_col:
-    st.write("# Sources referenced")
-    if st.session_state.documents:
-        tabs = st.tabs([f"Message {len(st.session_state.documents) - i}" for i in range(len(st.session_state.documents))])
-        for i, tab in enumerate(tabs):
-            with tab:
-                doc_history = st.session_state.documents[i]
-                for idx, doc in enumerate(doc_history["retrieved_docs"], 1):
-                    with st.expander(f"{doc.page_content}"):
-                        st.write(f"**Emotions:** {doc.metadata['emotions']}")
-                        st.write(f"**Location:** {doc.metadata['location']}")
-                        st.write(f"**Date:** {doc.metadata['timestamp_ms']}")
-                        st.write(f"**Sender name:** {doc.metadata['sender_name']}")
+                # Display the AI response immediately
+                st.write(answer)
+
+                # Display the associated references immediately
+                if retrieved_docs:
+                    with st.expander("References", expanded=False):  # Keep the expander closed by default
+                        for idx, doc in enumerate(retrieved_docs, 1):
+                            st.markdown(f"**Document {idx}:** {doc.page_content}")
+                            st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
+                            st.markdown(f"**Location:** {doc.metadata['location']}")
+                            st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
+                            st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
+                else:
+                    st.info("No references available for this response.")
