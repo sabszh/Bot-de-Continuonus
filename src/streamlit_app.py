@@ -1,6 +1,7 @@
 from main import ChatBot
 import streamlit as st
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+import streamlit_nested_layout
 
 # Repositories 
 repositories = {
@@ -9,7 +10,7 @@ repositories = {
     "Mistral-7B-Instruct-v0.1": "mistralai/Mistral-7B-Instruct-v0.1"
 }
 
-st.set_page_config(page_title="Bot de Continuonus", layout="wide")
+st.set_page_config(page_title="Bot de Continuonus", layout="wide",initial_sidebar_state='collapsed')
 
 # Sidebar configuration
 with st.sidebar:
@@ -66,7 +67,7 @@ def generate_response(input):
     return result
 
 # Main container for chat messages
-st.title("Bot de Continuonus")
+st.title("🤖 Bot de Continuonus")
 st.write('Bot de Continuonus is an artificial intelligence that allows you to explore what people participating in the Continuous artwork entered when asked "What do you want the future to remember?"')
 chat_container = st.container()
 
@@ -80,12 +81,12 @@ with chat_container:
             if entry["retrieved_docs"]:
                 with st.expander("References", expanded=False):  # Keep the expander closed by default
                     for idx, doc in enumerate(entry["retrieved_docs"], 1):
-                        st.markdown(f"**Document {idx}:** {doc.page_content}")
-                        st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
-                        st.markdown(f"**Location:** {doc.metadata['location']}")
-                        st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
-                        st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
-
+                        with st.expander(f"_\"{doc.page_content}\"_"):
+                            st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
+                            st.markdown(f"**Location:** {doc.metadata['location']}")
+                            st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
+                            st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
+                            
 # Handle user input at the bottom
 input = st.chat_input("Type your message here...")
 
@@ -122,10 +123,11 @@ if input:
                 if retrieved_docs:
                     with st.expander("References", expanded=False):  # Keep the expander closed by default
                         for idx, doc in enumerate(retrieved_docs, 1):
-                            st.markdown(f"**Document {idx}:** {doc.page_content}")
-                            st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
-                            st.markdown(f"**Location:** {doc.metadata['location']}")
-                            st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
-                            st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
+                            with st.expander(f"_\"{doc.page_content}\"_"):
+                                st.markdown(f"**Emotions:** {doc.metadata['emotions']}")
+                                st.markdown(f"**Location:** {doc.metadata['location']}")
+                                st.markdown(f"**Date:** {doc.metadata['timestamp_ms']}")
+                                st.markdown(f"**Sender name:** {doc.metadata['sender_name']}")
+
                 else:
                     st.info("No references available for this response.")
