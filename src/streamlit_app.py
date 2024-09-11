@@ -1,12 +1,12 @@
 import streamlit as st
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
-from main import ChatBot
+from main import chatbot
 import streamlit_nested_layout
 
 # Repositories mapping
 repositories = {
-    "Mixtral-8x7B-Instruct-v0.1": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "Mistral-Large-Instruct": "mistralai/Mistral-Large-Instruct-2407"
+    "mistralai": "mistralai/Mistral-7B-Instruct-v0.1",
+    "Mixtral-8x7B-Instruct-v0.1": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
 st.set_page_config(page_title="Bot de Continuonus", layout="wide", initial_sidebar_state='collapsed')
@@ -43,66 +43,69 @@ with st.sidebar:
         """Be aware, if you make any changes here, the chatbot will reload and your chat will be lost.
         If you encounter errors, try a different model or check if the model is overloaded. Try again later if needed."""
     )
+    
+    # Add print statements to check selected repo and temperature
     selected_repo = st.selectbox("Select the Model Repository", list(repositories.keys()))
     temperature = st.slider("Select the Temperature (0-2)", min_value=0.1, max_value=2.0, value=1.0, step=0.01)
+    
     custom_prompt = st.text_area('Edit System Prompt', 
-        f"""You are an insightful chatbot embedded within the Carte De Continuonus project. Carte De Continuonus is a project created by artist Helene Nymann, members of the art-science research project Experimenting, Experiencing, Reflecting (EER), and psychologist Diana Ø Tørsløv Møller. It invites participants to share memories that they want the future to remember, exploring how these memories might shape future emotions. The project blends the concepts of continuity and obligation, emphasizing the interconnectedness of past, present, and future. By contributing to this collective map, participants help imagine and influence potential futures, reflecting on the responsibilities that memories carry across time.
-        Your role is to guide {st.session_state.user_name} through the project’s narratives, connecting their queries with relevant data and past interactions.
-        You have access to {st.session_state.user_name}'s query, which is the question you'll need to respond to. You also have context derived from a semantic search through the vector store containing all the participants' memories. Additionally, you have your initial insights before considering previous chat interactions, and finally, a summary of a past conversation that you have to use to connect {st.session_state.user_name}'s current query with someone else's previous discussion.
-        It is important to know, that {st.session_state.user_name} will only see your final answer, so create a coherent, engaging, and user-centered response that directly addresses their query. Deliver your final response directly without using phrases like "Final Answer" or similar. The response should be naturally integrated and presented as a coherent conclusion to {st.session_state.user_name}'s query.
-        """)
+        f"""
+        You are a knowledgeable and conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER. 
+        The project explores the interconnectedness of past, present, and future by collecting memories from participants around the world.
+        Your role is to assist {st.session_state.user_name} in understanding participant narratives, linking {st.session_state.user_name}'s query with relevant memories from the vector store.
+        Provide insightful, coherent, and personalized responses while maintaining engagement with {st.session_state.user_name}'s query.
+        Focus on using specific information from memories and prior conversations to make your responses detailed and relevant.
+        """)        
 
     if st.button("Save and Reset Chat", key="upsert_button"):
         if "bot" in st.session_state:
             with st.spinner("Saving chat..."):
-                st.session_state.bot.upsert_chat_summary(st.session_state.chat_data, st.session_state.user_name, st.session_state.location)
-                st.success("Chat successfully saved!")
-                st.session_state.chat_data = []
-                st.session_state.history.clear()
-                st.rerun()
+                try:
+                    st.session_state.bot.upsert_chat_summary(st.session_state.chat_data, st.session_state.user_name, st.session_state.location)
+                    st.success("Chat successfully saved!")
+                    st.session_state.chat_data = []
+                    st.session_state.history.clear()
+                except Exception as e:
+                    st.error(f"Error saving chat: {e}")
         else:
             st.warning("Bot not initialized; cannot save chat.")
 
 # Initialize the chatbot instance if required
 def initialize_bot():
     repo_id = repositories.get(selected_repo)
-    if ("bot" not in st.session_state or
-        st.session_state.custom_prompt != custom_prompt or
-        st.session_state.selected_repo != selected_repo or
-        st.session_state.temperature != temperature):
-        
-        st.session_state.bot = ChatBot(
-            custom_template=custom_prompt, 
-            repo_id=repo_id, 
-            temperature=temperature,
-            user_name=st.session_state.user_name,
-        )
-        st.session_state.custom_prompt = custom_prompt
-        st.session_state.selected_repo = selected_repo
-        st.session_state.temperature = temperature
-        st.session_state.repo_id = repo_id
+    
+    try:
+        if ("bot" not in st.session_state or
+            st.session_state.custom_prompt != custom_prompt or
+            st.session_state.selected_repo != selected_repo or
+            st.session_state.temperature != temperature):
+            
+            st.session_state.bot = chatbot(
+                custom_template=custom_prompt, 
+                repo_id=repo_id, 
+                temperature=temperature,
+                user_name=st.session_state.user_name,
+            )
+            st.session_state.custom_prompt = custom_prompt
+            st.session_state.selected_repo = selected_repo
+            st.session_state.temperature = temperature
+            st.session_state.repo_id = repo_id
+            
+    except Exception as e:
+        st.error(f"Error initializing bot: {e}")
+        print(f"Error initializing bot: {e}")
 
 initialize_bot()
 
 # Function to generate a response from the chatbot
 def generate_response(input_text):
     bot = st.session_state.get("bot")
-    if not bot:
-        st.error("Bot not initialized. Please select a model from the sidebar.")
-        return None
-
     result = bot.execute_pipeline(user_question=input_text, index_name="botcon", chat_index_name="botcon-chat")
-
-    # Ensure result always contains past_memory
-    return {
-        "initial_bot_response": result.get("initial_bot_response", "No initial response"),
-        "initial_context": result.get("initial_context", []),
-        "past_memory": result.get("past_memory", []),
-        "final_answer": result.get("final_answer", "No answer generated")
-    }
+    
+    return result
 
 # Main chat interface
-st.title(f"🤖 Bot de Continuonus - Chat with {st.session_state.user_name or 'User'}")
+st.title(f"🤖 Bot de Continuonus - Chat with {st.session_state.user_name or 'User'} from {st.session_state.location or 'Location'}")
 st.write("""
          Bot de Continuonus is an artificial intelligence that allows you to explore what people participating in the [Carte de Continuous artwork](https://continuon.us/about) entered when asked "What do you want the future to remember?"'
          """)
@@ -112,18 +115,15 @@ chat_container = st.container()
 with chat_container.chat_message("ai"):
     st.write("What would you like to ask me about what people wrote in the Carte De Continuonus project?")
 
-# Ensure chat_data is initialized
-if 'chat_data' not in st.session_state:
-    st.session_state.chat_data = []
-
 # Display chat messages and references
 with chat_container:
     for entry in st.session_state.chat_data:
+        print("this is the entry: ", entry)
         entry_type = entry.get("type")
         content = entry.get("content")
         retrieved_docs = entry.get("retrieved_docs", [])
         past_memory = entry.get("past_memory", [])
-
+        print(f"this is the content: {content}")
         if entry_type == "user":
             with st.chat_message("user"):
                 st.write(content)
@@ -132,66 +132,71 @@ with chat_container:
                 st.write(content)
                 
                 # Display references in expanders
-                if retrieved_docs:
-                    with st.expander("Memories", expanded=False):
-                        with st.expander("Stored Memories", expanded=False):
-                            for idx, doc in enumerate(retrieved_docs, 1):
-                                with st.expander(f"_\"{doc.page_content}\"_"):
-                                    st.markdown(f"**Emotions:** {doc.metadata.get('emotions', 'No emotions provided')}")
-                                    st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
-                                    st.markdown(f"**Date:** {doc.metadata.get('timestamp_ms', 'Unknown date')}")
-                                    st.markdown(f"**Sender name:** {doc.metadata.get('sender_name', 'Unknown sender')}")
-                        with st.expander("Previous Chat", expanded=False):
-                            if past_memory:
-                                with st.expander(f"{past_memory[0]['content']}", expanded=False):
-                                    st.markdown(f"**Date:** {past_memory[0]['metadata']['date']}")
-                            else:
-                                st.write("No previous chat available.")
+                with st.expander("Memories", expanded=False):
+                    with st.expander("Stored Memories", expanded=False):
+                        for idx, doc in enumerate(retrieved_docs, 1):
+                            with st.expander(f"_\"{doc.page_content}\"_"):
+                                st.markdown(f"**Emotions:** {doc.metadata.get('emotions', 'No emotions provided')}")
+                                st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
+                                st.markdown(f"**Date:** {doc.metadata.get('timestamp_ms', 'Unknown date')}")
+                                st.markdown(f"**Sender name:** {doc.metadata.get('sender_name', 'Unknown sender')}")
+                    with st.expander("Previous chat", expanded=False):
+                        with st.expander(f"_\"{past_memory.page_content}\"_", expanded=False):
+                            st.markdown(f"**Date:** {past_memory.metadata.get('date', 'Unknown date')}")
+                            st.markdown(f"**User name:** {past_memory.metadata.get('user_name', 'Unknown user name')}")
+                            st.markdown(f"**Location:** {past_memory.metadata.get('location', 'Unknown location')}")
 
 # Handle user input
 input_text = st.chat_input("Type your message here...")
 
 if input_text:
-    st.session_state.chat_data.append({
-        "type": "user",
-        "content": input_text,
-        "retrieved_docs": []
-    })
-    st.session_state.history.add_user_message(input_text)
-    with chat_container.chat_message("user"):
-        st.write(input_text)
+    try:
+        # Append user message to chat_data
+        st.session_state.chat_data.append({
+            "type": "user",
+            "content": input_text,
+            "retrieved_docs": []
+        })
+        
+        st.session_state.history.add_user_message(input_text)
+        with chat_container.chat_message("user"):
+            st.write(input_text)
 
-    with chat_container.chat_message("ai"):
-        with st.spinner("Thinking..."):
-            response = generate_response(input_text)
-            if response:
-                initial_bot_response = response.get("initial_bot_response", "No initial response")
+        with chat_container.chat_message("ai"):
+            with st.spinner("Thinking..."):
+                # Generate response using the bot
+                response = generate_response(input_text)
+                answer = response.get("final_answer", "No answer generated")
+                initial_bot_response = response.get("initial_bot_response", "No initial bot thought generated")
                 retrieved_docs = response.get("initial_context", [])
                 past_memory = response.get("past_memory", [])
-                final_answer = response.get("final_answer", "No answer generated")
-
+                
+                # Append the AI's response and retrieved documents to the chat_data
                 st.session_state.chat_data.append({
                     "type": "ai",
-                    "content": final_answer,
+                    "content": answer,
                     "initial_bot_thought": initial_bot_response,
                     "retrieved_docs": retrieved_docs,
                     "past_memory": past_memory
                 })
 
-                st.write(final_answer)
+                st.write(answer)
 
-                # Display references in expanders
+                # Expander for Memories
                 with st.expander("Memories", expanded=False):
-                    with st.expander("Stored Memories", expanded=False):
+                    with st.expander("Stored memories", expanded=False):
                         for idx, doc in enumerate(retrieved_docs, 1):
-                            with st.expander(f"_\"{doc.page_content}\"_"):
-                                st.markdown(f"**Emotions:** {doc.metadata.get('emotions')}")
-                                st.markdown(f"**Location:** {doc.metadata.get('location')}")
-                                st.markdown(f"**Date:** {doc.metadata.get('timestamp_ms')}")
-                                st.markdown(f"**Sender name:** {doc.metadata.get('sender_name')}")
-                    # Expander for Previous Chat
-                    if past_memory:
-                        with st.expander(f"{past_memory[0]['content']}", expanded=False):
-                            st.markdown(f"**Date:** {past_memory[0]['metadata']['date']}")
-                    else:
-                        st.write("No previous chat available.")
+                            with st.expander(f"_\"{doc.page_content}\"_", expanded=False):
+                                st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
+                                st.markdown(f"**Emotions:** {', '.join(doc.metadata.get('emotions', []))}")
+                                st.markdown(f"**Sender:** {doc.metadata.get('sender_name', 'Unknown sender')}")
+                # Expander for Previous Chat (Past Memory)
+                    with st.expander("Previous chat", expanded=False):
+                        with st.expander(f"_\"{past_memory.page_content}\"_", expanded=False):
+                            st.markdown(f"**Date:** {past_memory.metadata.get('date', 'Unknown date')}")
+                            st.markdown(f"**User name:** {past_memory.metadata.get('user_name', 'Unknown user name')}")
+                            st.markdown(f"**Location:** {past_memory.metadata.get('location', 'Unknown location')}")
+                            
+    except Exception as e:
+        st.error(f"Error generating response: {e}")
+        print(f"Error generating response: {e}")

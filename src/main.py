@@ -11,7 +11,7 @@ from pinecone import Pinecone as pc
 # Load environment variables
 load_dotenv()
 
-class ChatBot:
+class chatbot:
     def __init__(self, custom_template=None, repo_id=None, temperature=0.8, user_name=None):
         self.embeddings = HuggingFaceEmbeddings()
         self.index_name = "botcon"
@@ -40,16 +40,21 @@ class ChatBot:
     
     def default_template(self):
         return f"""
-        You are an insightful chatbot embedded within the Carte De Continuonus project. Carte De Continuonus is a project created by artist Helene Nymann, members of the art-science research project Experimenting, Experiencing, Reflecting (EER), and psychologist Diana Ø Tørsløv Møller. It invites participants to share memories that they want the future to remember, exploring how these memories might shape future emotions. The project blends the concepts of continuity and obligation, emphasizing the interconnectedness of past, present, and future. By contributing to this collective map, participants help imagine and influence potential futures, reflecting on the responsibilities that memories carry across time.
-        Your role is to guide {self.user_name} through the project’s narratives, connecting their queries with relevant data and past interactions.
-        You have access to {self.user_name}'s query, which is the question you'll need to respond to. You also have context derived from a semantic search through the vector store containing all the participants' memories. Additionally, you have your initial insights before considering previous chat interactions, and finally, a summary of a past conversation that you have to use to connect {self.user_name}'s current query with someone else's previous discussion.
-        Refer to the name of the user when enganging with them. And it is important to know, that {self.user_name} will only see your final answer, so create a coherent, engaging, and user-centered response that directly addresses their query. Deliver your final response directly without using phrases like "Final Answer" or similar. The response should be naturally integrated and presented as a coherent conclusion to {self.user_name}'s query.
+        You are a knowledgeable and conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER. 
+        The project explores the interconnectedness of past, present, and future by collecting memories from participants around the world.
+        Your role is to assist {self.user_name} in understanding participant narratives, linking {self.user_name}'s query with relevant memories from the vector store.
+        Provide insightful, coherent, and personalized responses while maintaining engagement with {self.user_name}'s query.
         """
+
         
     def get_answer_from_llm(self, prompt):
         """Invoke the LLM with the constructed prompt and return the answer."""
-        response = self.llm(prompt)
-        return response
+        try:
+            response = self.llm.invoke(prompt)
+            return response
+        except Exception as e:
+            print(f"Error invoking LLM: {e}")
+            return "Error occurred while generating response"
         
     def format_context(self, documents):
         """Format the retrieved documents into a single string for the prompt, including metadata."""
@@ -74,60 +79,62 @@ class ChatBot:
             )
         return context
 
-    def create_prompt(self, user_question=None, initial_answer=None, context=None, past_chat=None):
+    def create_prompt(self, user_question=None, context=None, initial_answer=None, past_chat=None):
         """Construct the prompt for the LLM."""
         prompt = f"User: {self.user_name}\n" + self.template
 
         if user_question:
-            prompt += f"User query: {user_question}\n"
-            
+            prompt += f"\nUser query: {user_question}\n"
+        
         if context:
-            prompt += f"Context: {context}\n"
+            prompt += f"\nContext from retrieved memories:\n{context}\n"
         
         if initial_answer:
-            prompt += f"My current thoughts: {initial_answer}\n"
+            prompt += f"\nInitial thoughts based on memory retrieval: {initial_answer}\n"
         
         if past_chat:
-            prompt += f"A memory of a previous conversation you have had with a user: {past_chat}\n"
+            prompt += f"\nRelated previous conversation memory:\n{past_chat}\n"
         
-        prompt += "Using the above information, please provide a thoughtful response to the user's query."
-
+        prompt += "\nProvide a short response that directly answers the user's query using the query, context, initial answer and past chats. Your response: "
+        
         return prompt
 
-    def rag_chain(self, user_question=None, initial_answer=None, context=None, past_chat=None, return_docs=False, retrieve_only=False, index_name=None):
+
+    def rag_chain(self, user_question=None, context=None, initial_answer=None, past_chat=None, return_docs=False, retrieve_only=False, index_name=None):
         """
-        Perform the RAG chain operation.
+        Execute the RAG pipeline to retrieve documents and generate a response based on the user's question.
         
         Args:
-            user_question (str): The question to ask.
-            return_docs (bool): Whether to return the retrieved documents along with the answer.
-            index_name (str, optional): Custom Pinecone index name to use. If not provided, the default is used.
+            user_question (str): The user's question to query.
+            context (str): The context to provide to the model.
+            initial_answer (str): The initial answer to provide to the model.
+            past_chat (str): The past chat history to provide to the model.
+            return_docs (bool): Whether to return the retrieved documents in the result. Default is False.
+            retrieve_only (bool): Whether to return only the retrieved documents. Default is False.
+            index_name (str): The index name to use for retrieval. Default is None.
             
         Returns:
-            dict: Contains 'answer' and optionally 'retrieved_docs'.
+            dict: A dictionary containing the answer and optionally the retrieved documents.
         """
-        # Use the provided index_name or fall back to the default
+        
         index_name = index_name or self.index_name
         docsearch = Pinecone.from_existing_index(index_name, self.embeddings)
         retriever = MultiQueryRetriever.from_llm(retriever=docsearch.as_retriever(), llm=self.llm)
 
-        # Retrieve context documents
         documents = retriever.invoke(user_question)[:5]
-
-        # Format the context
-        formatted_context = self.format_context(documents)
-    
-        if retrieve_only:
-            # If retrieve_only is True, return the first retrieved document content along with its metadata
-            first_document = documents[0] if documents else None
-            return {'retrieved_docs': [{'content': first_document.page_content, 'metadata': first_document.metadata}]} if first_document else {'retrieved_docs': []}
         
-        # Create the full prompt
+        # Return only the retrieved documents if specified
+        if retrieve_only:
+            return {'retrieved_docs': documents} if documents else {'retrieved_docs': []}
+        
+        formatted_context = self.format_context(documents)
         prompt = self.create_prompt(user_question=user_question, context=formatted_context, initial_answer=initial_answer, past_chat=past_chat)
-        # Get the answer from the LLM
+        
         answer = self.get_answer_from_llm(prompt)
         
         result = {'answer': answer}
+        
+        # Include the retrieved documents in the result if specified
         if return_docs:
             result['retrieved_docs'] = documents
         
@@ -147,18 +154,18 @@ class ChatBot:
         """
         # Step 1: Initial RAG chain to retrieve documents and generate an initial response
         initial_response = self.rag_chain(user_question=user_question, return_docs=True, index_name=index_name)
-        initial_bot = initial_response['answer']
         initial_context = initial_response['retrieved_docs']
+        initial_bot = initial_response['answer']
 
         # Step 2: Retrieve context from chat history based on initial bot response
         past_memory_response = self.rag_chain(
             user_question=user_question, 
-            initial_answer=initial_bot, 
-            context=initial_context, 
+            context=initial_context,
+            initial_answer=initial_bot,
             retrieve_only=True,
             index_name=chat_index_name
         )
-        past_memory = past_memory_response['retrieved_docs']
+        past_memory = past_memory_response['retrieved_docs'][0]
 
         # Step 3: Generate the final answer by incorporating past chat context
         final_answer_response = self.rag_chain(
@@ -178,7 +185,7 @@ class ChatBot:
             'final_answer': final_answer_response['answer'],
         }
 
-    def upsert_chat_summary(self, chat_data,user_name, location):
+    def upsert_chat_summary(self, chat_data, user_name, location):
         """
         Summarize the provided chat data, embed the summary, and upsert it into the Pinecone index with a timestamp.
 
@@ -195,7 +202,7 @@ class ChatBot:
         )
         
         # Make a summary of the chat data
-        summary_prompt = "Make a summary of the chat data, extracting the theme of the user questions and what focus the user had. Here is the conversation:"
+        summary_prompt = "Make a summary of the chat data, extracting the theme of the user questions and what focus the user with the name {self.user_name} had. Here is the conversation:"
         summary = summary_llm(summary_prompt + chat_text)
 
         # Generate embeddings for the summary
