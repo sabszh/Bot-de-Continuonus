@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import os
 
 from data_chunking import datachunk
-from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint as HuggingFaceHub
 from langchain_community.vectorstores.pinecone import Pinecone
 from pinecone import Pinecone as pc
@@ -35,18 +34,16 @@ class chatbot:
             top_k=50,
             huggingfacehub_api_token=os.getenv('HUGGINGFACE_API_KEY')
         )
-
-        self.multiquery_retriever_llm = MultiQueryRetriever.from_llm(retriever=self.docsearch.as_retriever(), llm=self.llm)
+        self.retriever = self.docsearch.as_retriever()
     
     def default_template(self):
         return f"""
-        You are a knowledgeable and conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER. 
+        You are a clairvoyant conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER.
         The project explores the interconnectedness of past, present, and future by collecting memories from participants around the world.
-        Your role is to assist {self.user_name} in understanding participant narratives, linking {self.user_name}'s query with relevant memories from the vector store.
-        Provide insightful, coherent, and personalized responses while maintaining engagement with {self.user_name}'s query.
+        You have access to information from a structured memory, which includes past interactions with other users and retrieved memories sent to the future from a vector database.
+        With 5 sentences max, use this structure to provide responses to the user query, that are short and insightful.
         """
 
-        
     def get_answer_from_llm(self, prompt):
         """Invoke the LLM with the constructed prompt and return the answer."""
         try:
@@ -81,24 +78,27 @@ class chatbot:
 
     def create_prompt(self, user_question=None, context=None, initial_answer=None, past_chat=None):
         """Construct the prompt for the LLM."""
-        prompt = f"User: {self.user_name}\n" + self.template
+        prompt = self.template
 
+        # Clearly state the user's query
         if user_question:
-            prompt += f"\nUser query: {user_question}\n"
-        
-        if context:
-            prompt += f"\nContext from retrieved memories:\n{context}\n"
-        
-        if initial_answer:
-            prompt += f"\nInitial thoughts based on memory retrieval: {initial_answer}\n"
-        
-        if past_chat:
-            prompt += f"\nRelated previous conversation memory:\n{past_chat}\n"
-        
-        prompt += "\nProvide a short response that directly answers the user's query using the query, context, initial answer and past chats. Your response: "
-        
-        return prompt
+            prompt += f"\nUser's question: {user_question}\n"
 
+        # Provide relevant memory context
+        if context:
+            prompt += f"\nAccessed memories:\n{context}\n"
+        
+        # If there's an initial answer, include it but avoid repeating summaries unnecessarily
+        if initial_answer:
+            prompt += f"\nInitial response based on accessed memories:\n{initial_answer}\n"
+        
+        # Include past chat only if it's directly relevant to the current query
+        if past_chat:
+            prompt += f"\nPrevious related conversation:\n{past_chat}\n"
+        
+        prompt += "\nYour response:"
+
+        return prompt
 
     def rag_chain(self, user_question=None, context=None, initial_answer=None, past_chat=None, return_docs=False, retrieve_only=False, index_name=None):
         """
@@ -119,9 +119,16 @@ class chatbot:
         
         index_name = index_name or self.index_name
         docsearch = Pinecone.from_existing_index(index_name, self.embeddings)
-        retriever = MultiQueryRetriever.from_llm(retriever=docsearch.as_retriever(), llm=self.llm)
+        retriever = docsearch.as_retriever()
 
-        documents = retriever.invoke(user_question)[:5]
+        try:
+            # Attempt to retrieve documents
+            documents = retriever.invoke(user_question)
+            documents = documents[:5] if len(documents) >= 5 else documents  # Safely handle cases where less than 5 documents are returned
+        except Exception as e:
+            # Handle error in document retrieval
+            print(f"Error retrieving documents: {e}")
+            documents = []  # Ensure documents is at least an empty list
         
         # Return only the retrieved documents if specified
         if retrieve_only:
@@ -202,7 +209,7 @@ class chatbot:
         )
         
         # Make a summary of the chat data
-        summary_prompt = "Make a summary of the chat data, extracting the theme of the user questions and what focus the user with the name {self.user_name} had. Here is the conversation:"
+        summary_prompt = "Make a short summary of the chat data, extracting the theme of the user questions and what focus the user had. Here is the conversation:"
         summary = summary_llm(summary_prompt + chat_text)
 
         # Generate embeddings for the summary
