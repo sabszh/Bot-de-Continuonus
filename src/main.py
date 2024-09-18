@@ -37,12 +37,10 @@ class chatbot:
         self.retriever = self.docsearch.as_retriever()
     
     def default_template(self):
-        return f"""
-        You are a clairvoyant conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER.
-        The project explores the interconnectedness of past, present, and future by collecting memories from participants around the world.
-        You have access to information from a structured memory, which includes past interactions with other users and retrieved memories sent to the future from a vector database.
-        With 5 sentences max, use this structure to provide responses to the user query, that are short and insightful.
-        """
+        return f"""You are a chatbot assistant to the artwork Carte de Continuonus, and you have access to glimpses of the future through other people's memories.
+        The user {self.user_name} will ask you questions about the memories stored in the Carte de Continuonus project.
+        Your job is to respond to them in an interesting and engaging way that combines their question to other people's memories, and perhaps also a past conversation if it can add value to the conversation.
+        Always respond in the shortest way possible."""
 
     def get_answer_from_llm(self, prompt):
         """Invoke the LLM with the constructed prompt and return the answer."""
@@ -83,22 +81,24 @@ class chatbot:
         # Clearly state the user's query
         if user_question:
             prompt += f"\nUser's question: {user_question}\n"
-
-        # Provide relevant memory context
+        
+        # Provide specific memory context only if relevant
         if context:
-            prompt += f"\nAccessed memories:\n{context}\n"
+            prompt += f"\nSubmissions to the Continuonus Artwork:\n{context}\n"
         
-        # If there's an initial answer, include it but avoid repeating summaries unnecessarily
+        # Include an initial response based on accessed memories if available
         if initial_answer:
-            prompt += f"\nInitial response based on accessed memories:\n{initial_answer}\n"
+            prompt += f"\nFirst generated response:\n{initial_answer}\n"
         
-        # Include past chat only if it's directly relevant to the current query
+        # Include past chat only if it directly connects to the current question
         if past_chat:
-            prompt += f"\nPrevious related conversation:\n{past_chat}\n"
+            prompt += f"\nData from previous conversations with this LLM:\n{past_chat}\n"
         
-        prompt += "\nYour response:"
+        # Prompt for the final response
+        prompt += "\nFinal response:"
 
         return prompt
+
 
     def rag_chain(self, user_question=None, context=None, initial_answer=None, past_chat=None, return_docs=False, retrieve_only=False, index_name=None):
         """
@@ -136,7 +136,7 @@ class chatbot:
         
         formatted_context = self.format_context(documents)
         prompt = self.create_prompt(user_question=user_question, context=formatted_context, initial_answer=initial_answer, past_chat=past_chat)
-        
+        print("Constructed Prompt: ", prompt)
         answer = self.get_answer_from_llm(prompt)
         
         result = {'answer': answer}
@@ -204,13 +204,14 @@ class chatbot:
         
         # Initialize a summary model
         summary_llm = HuggingFaceHub(
-            repo_id="mistralai/Mistral-7B-Instruct-v0.3",
+            repo_id=self.repo_id,
             huggingfacehub_api_token=os.getenv('HUGGINGFACE_API_KEY')
         )
         
         # Make a summary of the chat data
         summary_prompt = "Make a short summary of the chat data, extracting the theme of the user questions and what focus the user had. Here is the conversation:"
         summary = summary_llm(summary_prompt + chat_text)
+        print("Generated Summary: ", summary)
 
         # Generate embeddings for the summary
         summary_embedding = self.embeddings.embed_documents([summary])[0]

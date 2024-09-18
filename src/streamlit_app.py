@@ -5,8 +5,9 @@ import streamlit_nested_layout
 
 # Repositories mapping
 repositories = {
-    "mistralai": "mistralai/Mistral-7B-Instruct-v0.1",
-    "Mixtral-8x7B-Instruct-v0.1": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    "llama instruct": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "mistral 7b instruct": "mistralai/Mistral-7B-Instruct-v0.1",
+    "mistral 8x7b instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
 st.set_page_config(page_title="Bot de Continuonus", layout="wide", initial_sidebar_state='collapsed')
@@ -49,20 +50,16 @@ with st.sidebar:
     temperature = st.slider("Select the Temperature (0-2)", min_value=0.1, max_value=2.0, value=1.0, step=0.01)
     
     custom_prompt = st.text_area('Edit System Prompt', 
-        f"""
-        You are a clairvoyant conversational chatbot for the Carte De Continuonus project, created by artist Helene Nymann and the research group EER.
-        The project explores the interconnectedness of past, present, and future by collecting memories from participants around the world.
-        Your role is to assist {st.session_state.user_name} by using information from the participants' memories stored in the database and from past interactions.
-        Provide short, coherent, and personalized responses to {st.session_state.user_name}'s query by linking it to relevant memories and past conversations.
-        Do not treat retrieved information as something the user has just provided, but rather as information that you have access to from the database.
-        """
-)        
+        f"""You are a chatbot assistant to the artwork Carte de Continuonus, and you have access to glimpses of the future through other people's memories.
+        The user {st.session_state.user_name} will ask you questions about the memories stored in the Carte de Continuonus project.
+        Your job is to respond to them in an interesting and engaging way that combines their question to other people's memories, and perhaps also a past conversation if it can add value to the conversation.
+        Always respond in the shortest way possible."""
+)
 
     if st.button("Save and Reset Chat", key="upsert_button"):
         if "bot" in st.session_state:
             with st.spinner("Saving chat..."):
                 try:
-                    print("this is the chat data: ", st.session_state.chat_data)
                     st.session_state.bot.upsert_chat_summary(st.session_state.chat_data, st.session_state.user_name, st.session_state.location)
                     st.success("Chat successfully saved!")
                     st.session_state.chat_data = []
@@ -109,7 +106,7 @@ def generate_response(input_text):
 # Main chat interface
 st.title(f"🤖 Bot de Continuonus")
 st.write("""
-         Bot de Continuonus is an artificial intelligence that allows you to explore what people participating in the [Carte de Continuous artwork](https://continuon.us/about) entered when asked "What do you want the future to remember?"'
+         Bot de Continuonus is an artificial intelligence that allows you to explore what people participating in the [Carte de Continuonus artwork](https://continuon.us/about) entered when asked "What do you want the future to remember?"'
          """)
 
 chat_container = st.container()
@@ -120,12 +117,11 @@ with chat_container.chat_message("ai"):
 # Display chat messages and references
 with chat_container:
     for entry in st.session_state.chat_data:
-        print("this is the entry: ", entry)
         entry_type = entry.get("type")
         content = entry.get("content")
         retrieved_docs = entry.get("retrieved_docs", [])
         past_memory = entry.get("past_memory", [])
-        print(f"this is the content: {content}")
+
         if entry_type == "user":
             with st.chat_message("user"):
                 st.write(content)
@@ -134,8 +130,8 @@ with chat_container:
                 st.write(content)
                 
                 # Expander for Memories
-                with st.expander("Memories", expanded=False):
-                    with st.expander("Stored memories", expanded=False):
+                with st.expander("Referenced data", expanded=False):
+                    with st.expander("Submissions to the Continuonus Artwork", expanded=False):
                         for idx, doc in enumerate(retrieved_docs, 1):
                             with st.expander(f"_\"{doc.page_content}\"_", expanded=False):
                                 st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
@@ -143,8 +139,8 @@ with chat_container:
                                 st.markdown(f"**Sender:** {doc.metadata.get('sender_name', 'Unknown sender')}")
                 # Expander for Previous Chat (Past Memory)
                     if past_memory:
-                        with st.expander("Previous chat", expanded=False):
-                            with st.expander(f"*\"{past_memory.page_content}\"*", expanded=False):
+                        with st.expander("Data from previous conversations with this LLM", expanded=False):
+                            with st.expander(f"_\"{past_memory.page_content}\"_", expanded=False):
                                 st.markdown(f"**Date:** {past_memory.metadata.get('date', 'Unknown date')}")
                                 st.markdown(f"**User name:** {past_memory.metadata.get('user_name', 'Unknown user name')}")
                                 st.markdown(f"**Location:** {past_memory.metadata.get('location', 'Unknown location')}")
@@ -196,8 +192,8 @@ if input_text:
                 st.write(answer)
 
                 # Expander for Memories
-                with st.expander("Memories", expanded=False):
-                    with st.expander("Stored memories", expanded=False):
+                with st.expander("Referenced data", expanded=False):
+                    with st.expander("Submissions to the Continuonus Artwork", expanded=False):
                         for idx, doc in enumerate(retrieved_docs, 1):
                             with st.expander(f"_\"{doc.page_content}\"_", expanded=False):
                                 st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
@@ -205,8 +201,8 @@ if input_text:
                                 st.markdown(f"**Sender:** {doc.metadata.get('sender_name', 'Unknown sender')}")
                 # Expander for Previous Chat (Past Memory)
                     if past_memory:
-                        with st.expander("Previous chat", expanded=False):
-                            with st.expander(f"_\"{past_memory.page_content}\"_", expanded=False):
+                        with st.expander("Data from previous conversations with this LLM", expanded=False):
+                            with st.expander(f"{past_memory.page_content}", expanded=False):
                                 st.markdown(f"**Date:** {past_memory.metadata.get('date', 'Unknown date')}")
                                 st.markdown(f"**User name:** {past_memory.metadata.get('user_name', 'Unknown user name')}")
                                 st.markdown(f"**Location:** {past_memory.metadata.get('location', 'Unknown location')}")
