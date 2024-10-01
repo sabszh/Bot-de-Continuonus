@@ -6,9 +6,10 @@ import streamlit_nested_layout
 
 # Repositories mapping
 repositories = {
-    "llama instruct": "meta-llama/Llama-3.1-8B-Instruct",
-    "mistral 7b instruct": "mistralai/Mistral-7B-Instruct-v0.1",
-    "mistral 8x7b instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    "mistral 8x7b instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "llama instruct": "meta-llama/Llama-3.1-70B-Instruct",
+    "inference endpoint": "https://v2z2wd97mmpdh4nx.us-east-1.aws.endpoints.huggingface.cloud",
+    "mistral 7b instruct": "mistralai/Mistral-7B-Instruct-v0.1"
 }
 
 st.set_page_config(page_title="Bot de Continuonus", layout="wide", initial_sidebar_state='collapsed')
@@ -57,18 +58,18 @@ with st.sidebar:
     # Sourcedata prompt editing
     prompt_sourcedata = st.text_area(
         'Edit Prompt for Sourcedata, use these variables: {chat_history} {user_input}, {orginal_data}, {user_name}',
-        """You are an assistant associated with the artwork Carte de Continuonus by Helena Nymann. This project invites people viewing the artwork to respond to the question: "What do you want the future to remember?" The data consists of their name, location, and the response they entered to the question, which is the data we are most interested in. You are now assisting the user "{user_name}" with their query: "{user_input}". Below is the relevant data submitted to the continuonus artwork that was retrieved from the database for this query: "{original_data}". Based on this data, provide a concise answer to the user’s question in 1-3 sentences. The previous chat history for this session so far is: {chat_history} Your response: """
-    )
+       """You are an assistant associated with the artwork Carte de Continuonus by Helena Nymann. This project invites people viewing the artwork to respond to the question: "What do you want the future to remember?" The data consists of their name, location, and the response they entered to the question, which is the data we are most interested in. You are now assisting the user "{user_name}" with their query: "{user_input}". Below is the relevant data submitted to the continuonus artwork that was retrieved from the database for this query: "{original_data}". Based on this data, provide a concise answer to the user’s question in 1-3 sentences. The previous chat history for this session so far is: {chat_history} Your response:"""
+)
 
     # Conversation prompt editing
     prompt_conv = st.text_area(
         'Edit Prompt for Conversation Context, use these variables:{chat_history} {user_input}, {llm_response}, {past_chat}, {user_name}',
-        """You are an assistant observing conversations between the user and another LLM regarding statements submitted by viewers of the “Carte de Continuonus” artwork, by Helene Nyman. All interactions between people and the LLM are recorded and stored in your database. When people ask questions about the data, you get the question and the answer from the LLM. You use that data to search your database of past conversations for conversations that might be related. You will create a summary of those past conversations no longer than 4 sentences. Your summary should mention the name of the person involved in the past conversations, so that if the user wants to, they can follow up with them.
-    Here is the last question asked by the user in this session: "{user_name}" asked: {user_input}
-    Here is what the LLM you are watching responded with: “{llm_response}”
-    Here is relevant data from past conversations that is relevant: {past_chat}
-    Here is the chat history for this session, so that your response can be aware of the context: {chat_history}
-    Your response: """)
+        """You are an assistant observing conversations between the user and another LLM regarding statements submitted by viewers of the “Carte de Continuonus” artwork, by Helene Nyman. All interactions between people and the LLM are recorded and stored in your database. When people ask questions about the data, you get the question and the answer from the LLM. You use that data to search your database of past conversations for conversations that might be related. You will create a summary of those past conversations no longer than 4 sentences. Your summary should mention the name of the person involved in the past conversations.
+        Here is the last question asked by the user in this session: "{user_name}" asked: {user_input}
+        Here is what the LLM you are watching responded with and what the user is seeing: "{llm_response}"
+        Here is relevant data from past conversations that is relevant: {past_chat}
+        Here is the chat history for this session, so that your response can be aware of the context: {chat_history}
+        Your response:""")
 
 # Initialize the chatbot instance if required
 def initialize_bot():
@@ -157,7 +158,7 @@ with chat_container:
                         with st.expander("Data from previous conversations with this LLM", expanded=False):
                             for idx, doc in enumerate(past_chat_context, 1):
                                 with st.expander(f"User question: _\"{doc.metadata.get('user_question')}\"_", expanded=False):
-                                    st.markdown(f"**AI Response:** _\"{doc.metadata.get('ai_output')}\"_")
+                                    st.markdown(f"**AI Response:** {doc.metadata.get('ai_output')}")
                                     st.markdown(f"**Date:** {doc.metadata.get('date', 'Unknown date')}")
                                     st.markdown(f"**User name:** {doc.metadata.get('user_name', 'Unknown user name')}")
                                     st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")
@@ -212,8 +213,8 @@ if input_text:
                     if past_chat_context:
                         with st.expander("Data from previous conversations with this LLM", expanded=False):
                             for idx, doc in enumerate(past_chat_context, 1):
-                                with st.expander(f"User question: _\"{doc.metadata.get('user_question')}\"_", expanded=False):
-                                    st.markdown(f"**AI Response:** _\"{doc.metadata.get('ai_output')}\"_")
+                                with st.expander(f"User question: {doc.metadata.get('user_question')}", expanded=False):
+                                    st.markdown(f"**AI Response:** {doc.metadata.get('ai_output')}")
                                     st.markdown(f"**Date:** {doc.metadata.get('date', 'Unknown date')}")
                                     st.markdown(f"**User name:** {doc.metadata.get('user_name', 'Unknown user name')}")
                                     st.markdown(f"**Location:** {doc.metadata.get('location', 'Unknown location')}")

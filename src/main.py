@@ -101,6 +101,7 @@ class chatbot:
             for idx, doc in enumerate(documents, start=1):
                 # Extract metadata fields
                 metadata = doc.metadata
+                user_name = metadata.get("user_name", "Unknown User")
                 user_question = metadata.get("user_question", "Unknown Question")
                 ai_output = metadata.get("ai_output", "Unknown Response")
                 session_id = metadata.get("session_id", "Unknown Session ID")
@@ -108,6 +109,7 @@ class chatbot:
 
                 # Format each document's content with its metadata
                 context += (
+                    f'User {idx}: {user_name}\n'
                     f'Chat session {idx}: {session_id}\n'
                     f'User Question: "{user_question}"\n'
                     f'AI Response: "{ai_output}"\n'
