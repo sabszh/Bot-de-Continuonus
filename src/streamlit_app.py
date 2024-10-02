@@ -6,10 +6,9 @@ import streamlit_nested_layout
 
 # Repositories mapping
 repositories = {
-    "mistral 8x7b instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "llama instruct": "meta-llama/Llama-3.1-70B-Instruct",
-    "inference endpoint": "https://v2z2wd97mmpdh4nx.us-east-1.aws.endpoints.huggingface.cloud",
-    "mistral 7b instruct": "mistralai/Mistral-7B-Instruct-v0.1"
+    "Llama 70B Instruct": "meta-llama/Llama-3.1-70B-Instruct",
+    "Mistral 8x7b Instruct": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "Mistral 7B Instruct": "mistralai/Mistral-7B-Instruct-v0.1"
 }
 
 st.set_page_config(page_title="Bot de Continuonus", layout="wide", initial_sidebar_state='collapsed')

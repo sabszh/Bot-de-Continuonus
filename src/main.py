@@ -70,8 +70,8 @@ class chatbot:
             response = self.llm.invoke(prompt)
             return response
         except Exception as e:
-            print(f"Error invoking LLM: {e}")
-            return "Error occurred while generating response"
+            error = f"Error invoking LLM: {e}"
+            return error
     
     # Method to format the context
     def format_context(self, documents, chat=False):
