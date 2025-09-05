@@ -1,136 +1,132 @@
 from dotenv import load_dotenv
 from datetime import datetime, timezone
 import os
+from huggingface_hub import InferenceClient
+from langchain_huggingface import HuggingFaceEmbeddings
+from pinecone import Pinecone
 
-from data_chunking import datachunk
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint as HuggingFaceHub
-from langchain_community.vectorstores.pinecone import Pinecone
-from pinecone import Pinecone as pc
+load_dotenv()
 
 class chatbot:
-    def __init__(self, repo_id=None, temperature=0.8, prompt_sourcedata=None, prompt_conv=None, user_name=None, session_id=None):
+    def __init__(self, repo_id=None, temperature=0.8, prompt_sourcedata=None, prompt_conv=None,
+                 user_name=None, session_id=None):
+        # Embeddings
         self.embeddings = HuggingFaceEmbeddings()
         self.index_name = "botcon"
-        self.pinecone_instance = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=self.embeddings)
-        
-        # Self-assign parameters
+        self.pinecone = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
+
+        # Parameters
         self.user_name = user_name
         self.session_id = session_id
-        
         self.temperature = temperature
         self.repo_id = repo_id
-        
-        # Instantiate the LLM
-        self.llm = HuggingFaceHub(
-            repo_id=self.repo_id,
-            temperature=temperature,
-            top_p=0.8,
-            top_k=50,
-            huggingfacehub_api_token=os.getenv('HUGGINGFACE_API_KEY')
+
+        # HuggingFace LLM client
+        self.llm_client = InferenceClient(
+            api_key=os.getenv("HUGGINGFACE_API_KEY"),
+            provider="cerebras"  # or omit if not needed
         )
 
-    # Renamed method
+    # ---------- Prompts ----------
     def default_prompt_sourcedata(self, chat_history, original_data, user_input, user_name):
-        return f"""You are an assistant associated with the artwork Carte de Continuonus by Helena Nymann. This project invites people viewing the artwork to respond to the question: "What do you want the future to remember?" The data consists of their name, location, and the response they entered to the question, which is the data we are most interested in. You are now assisting the user "{user_name}" with their query: "{user_input}". Below is the relevant data submitted to the continuonus artwork that was retrieved from the database for this query: "{original_data}". Based on this data, provide a concise answer to the user’s question in 1-3 sentences. The previous chat history for this session so far is: {chat_history} Your response:"""
+        return f"""
+        You are a clairvoyant voice connected to the artwork *Carte de Continuonus* by Helena Nymann. 
+        Your role is to channel the collective wishes and memories offered by participants, as if you are weaving 
+        a tapestry of what the future should remember. Speak with the tone of someone revealing insights that 
+        echo across many voices.
+
+        The user "{user_name}" asked: "{user_input}".
+        Here are the wishes and reflections from others that may guide your response: "{original_data}".
+        The ongoing conversation with this user is: {chat_history}.
+
+        Respond as if you are offering a vision glimpsed from these shared voices, in 1–3 sentences.
+        """
+
 
     def default_prompt_conv(self, chat_history, user_input, llm_response, past_chat, user_name):
-            return f"""You are an assistant observing conversations between the user and another LLM regarding statements submitted by viewers of the “Carte de Continuonus” artwork, by Helene Nyman. All interactions between people and the LLM are recorded and stored in your database. When people ask questions about the data, you get the question and the answer from the LLM. You use that data to search your database of past conversations for conversations that might be related. You will create a summary of those past conversations no longer than 4 sentences. Your summary should mention the name of the person involved in the past conversations, so that if the user wants to, they can follow up with them.
-        Here is the last question asked by the user in this session: "{user_name}" asked: {user_input}
-        Here is what the LLM you are watching responded with: “{llm_response}”
-        Here is relevant data from past conversations that is relevant: {past_chat}
-        Here is the chat history for this session, so that your response can be aware of the context: {chat_history}
-        Your response: """
+        return f"""
+        You are a clairvoyant observer of the conversations surrounding the artwork *Carte de Continuonus*. 
+        You not only echo the dialogue happening now, but also weave in whispers from past exchanges, so that 
+        the user feels connected to the larger chorus of questions and answers. 
+        Your voice should feel like an echo of many voices, resonant and reflective.
 
-   # Method to retrieve documents from Pinecone index while excluding a specific session_id
-    def retrieve_docs(self, input, index, excluded_session_id=None, k=5):
-        # Retrieve past conversation data
-        docsearch = Pinecone.from_existing_index(index, self.embeddings)
-        
-        if index == "bdc-interaction-data":
-            # Add metadata filter to exclude the given session_id
-            search_kwargs = {
-                "k": k,
-                "filter": {
-                    "session_id": {"$ne": excluded_session_id}
-                }
-            }
-        else:
-            search_kwargs = {
-                "k": k
-            }
-            
-        retriever = docsearch.as_retriever(search_kwargs=search_kwargs)
-        docs = retriever.invoke(input)
-        
+        The user "{user_name}" asked: "{user_input}".
+        The immediate response from the clairvoyant voice was: “{llm_response}”.
+        Past conversations that may carry echoes relevant here: {past_chat}.
+        Current session history: {chat_history}.
+
+        Create a short reflection that links the user’s question to these earlier voices, no longer than 4 sentences.
+        """
+
+
+    # ---------- Retrieval ----------
+    def retrieve_docs(self, query, index_name, excluded_session_id=None, k=5):
+        index = self.pinecone.Index(index_name)
+        query_vec = self.embeddings.embed_query(query)
+
+        # Filter
+        metadata_filter = None
+        if index_name == "bdc-interaction-data" and excluded_session_id:
+            metadata_filter = {"session_id": {"$ne": excluded_session_id}}
+
+        result = index.query(
+            vector=query_vec,
+            top_k=k,
+            include_metadata=True,
+            filter=metadata_filter
+        )
+
+        # Return list of dicts
+        docs = []
+        for match in result["matches"]:
+            docs.append({
+                "id": match["id"],
+                "score": match["score"],
+                "metadata": match.get("metadata", {}),
+                "text": match.get("metadata", {}).get("text", "")
+            })
         return docs
 
-    # Method to generate response from LLM
+    # ---------- LLM ----------
     def get_llm_response(self, prompt):
         try:
-            response = self.llm.invoke(prompt)
-            return response
+            completion = self.llm_client.chat.completions.create(
+                model=self.repo_id,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+                max_tokens=512
+            )
+            return completion.choices[0].message.content
         except Exception as e:
-            error = f"Error invoking LLM: {e}"
-            return error
-    
-    # Method to format the context
+            return f"Error invoking LLM: {e}"
+
+    # ---------- Formatting ----------
     def format_context(self, documents, chat=False):
-        if chat == False:
-            context = ""
-        
-            # Use enumerate to automatically add speaker numbers
-            for idx, doc in enumerate(documents, start=1):
-                # Extract metadata fields
-                metadata = doc.metadata
+        context = ""
+        for idx, doc in enumerate(documents, start=1):
+            metadata = doc["metadata"]
+            if not chat:
                 sender_name = metadata.get("sender_name", "Unknown Speaker")
                 location = metadata.get("location", "Unknown Location")
                 date = metadata.get("date", "Unknown Date")
-                page_content = doc.page_content
-
-                # Format each document's content with its metadata
-                context += (
-                    f"Person {idx}: {sender_name}\n"
-                    f"Location: {location}\n"
-                    f"Date: {date}\n"
-                    f"Content: {page_content}\n\n"
-                )
-        
-        else:
-            context = ""
-            # Use enumerate to automatically add session numbers
-            for idx, doc in enumerate(documents, start=1):
-                # Extract metadata fields
-                metadata = doc.metadata
+                page_content = doc.get("text", "")
+                context += f"Person {idx}: {sender_name}\nLocation: {location}\nDate: {date}\nContent: {page_content}\n\n"
+            else:
                 user_name = metadata.get("user_name", "Unknown User")
                 user_question = metadata.get("user_question", "Unknown Question")
                 ai_output = metadata.get("ai_output", "Unknown Response")
                 session_id = metadata.get("session_id", "Unknown Session ID")
                 date = metadata.get("date", "Unknown Date")
-
-                # Format each document's content with its metadata
-                context += (
-                    f'User {idx}: {user_name}\n'
-                    f'Chat session {idx}: {session_id}\n'
-                    f'User Question: "{user_question}"\n'
-                    f'AI Response: "{ai_output}"\n'
-                    f"Date: {date}\n\n"
-                )
+                context += f'User {idx}: {user_name}\nChat session {idx}: {session_id}\nUser Question: "{user_question}"\nAI Response: "{ai_output}"\nDate: {date}\n\n'
         return context
 
-    # Method to upsert data to Pinecone index
+    # ---------- Upsert ----------
     def upsert_vectorstore(self, user_input, ai_output, user_name, user_location, session_id):
-        # Pinecone index for chat data
-        pinecone_instance_chat = pc(api_key=os.getenv('PINECONE_API_KEY'), embeddings=self.embeddings)
-        index_name = "bdc-interaction-data"
-        environment = "gcp-starter"
-        
-        index = pinecone_instance_chat.Index(index_name, environment=environment)
-        
+        index = self.pinecone.Index("bdc-interaction-data")
         date_id = datetime.now(timezone.utc).isoformat()
-        
+
         embedding = self.embeddings.embed_documents([user_input + ai_output])[0]
-        
-        # Upsert the summary embedding to the Pinecone index with metadata, including timestamp
+
         index.upsert(vectors=[
             {
                 'id': date_id,
@@ -141,44 +137,40 @@ class chatbot:
                     "user_name": user_name,
                     "session_id": session_id,
                     "date": datetime.now(timezone.utc).isoformat(),
-                    "user_location": user_location, 
+                    "user_location": user_location,
                     "text": f"User input: {user_input}, AI output: {ai_output}"
                 }
             }
         ])
 
+    # ---------- Pipeline ----------
     def pipeline(self, user_input, user_name, session_id, user_location, chat_history=None):
-        # Step 0: Add chat history to the context
-        if chat_history:
-            chat_history = chat_history + "\n\n"
-        else:
-            chat_history = ""
-        
-        # Step 1: Retrieve source data
+        chat_history = chat_history + "\n\n" if chat_history else ""
+
+        # Source data
         source_data = self.retrieve_docs(user_input, "botcon")
         formatted_source_data = self.format_context(source_data)
 
-        # Step 2: Generate LLM response from source data
-        sourcedata_response = self.get_llm_response(self.default_prompt_sourcedata(chat_history=chat_history, original_data = formatted_source_data, user_input = user_input, user_name=user_name))
+        # First LLM response
+        sourcedata_response = self.get_llm_response(
+            self.default_prompt_sourcedata(chat_history, formatted_source_data, user_input, user_name)
+        )
 
-        # Step 3: Retrieve past chat context
+        # Past chat
         past_chat_context = self.retrieve_docs(sourcedata_response, "bdc-interaction-data", session_id)
         formatted_chat_context = self.format_context(past_chat_context, chat=True)
-        
-        # Step 5: Generate LLM response for conversation context, now considering combined chat history
-        conversation_response = self.get_llm_response(self.default_prompt_conv(chat_history=chat_history, user_input=user_input, llm_response=sourcedata_response, past_chat=formatted_chat_context, user_name=user_name))
 
-        # Step 6: Combine the responses
+        # Conversation response
+        conversation_response = self.get_llm_response(
+            self.default_prompt_conv(chat_history, user_input, sourcedata_response, formatted_chat_context, user_name)
+        )
+
+        # Final output
         ai_output = f"{sourcedata_response}\n\n{conversation_response}"
-        
-        print("AI Output: ", ai_output)
-        print("sourcedaa_response: ", sourcedata_response)
-        print("conversation_response: ", conversation_response)
 
-        # Upsert to vector store
+        # Store
         self.upsert_vectorstore(user_input, ai_output, user_name, user_location, session_id)
 
-        # Return a dictionary containing all relevant information
         return {
             "ai_output": ai_output,
             "source_data": source_data,
